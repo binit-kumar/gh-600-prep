@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="icon.png">
+  <title>GH-600 Flashcards</title>
+  <style>
+    body { font-family: 'Poppins', sans-serif; background: #f4f4f4; margin: 0; padding: 2em; }
+    .container { max-width: 900px; margin: auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #ccc; padding: 2em; }
+    .container h2 { text-align: center; }
+    .container.review-mode { max-width: 1000px; }
+    .quiz-flip-shell { flex: 1; perspective: 1000px; }
+    .quiz-inner-flip { position: relative; width: 100%; display: grid; transition: transform 0.6s; transform-style: preserve-3d; }
+    .quiz-inner-flip.flipped { transform: rotateY(180deg); }
+    button { padding: 0.5em 1.5em; margin: 0.5em; font-size: 1em; border: none; border-radius: 4px; background: #3b82f6; color: #fff; cursor: pointer; }
+    button:disabled { background: #bbb; }
+    .subject-select { margin-bottom: 1em; }
+    .options { margin-bottom: 1em; }
+    .option { display: block; margin: 0.5em 0; }
+    .concept-panel { background: #f9fafb; border-left: 4px solid #3b82f6; padding: 1em; border-radius: 4px; margin-bottom: 1em; }
+    .concept-content { white-space: normal; line-height: 1.45; max-height: 600px; overflow: auto; }
+    .concept-content h1 { font-size: 1.2rem; margin: 0.2em 0 0.5em; }
+    .concept-content h2 { font-size: 1.05rem; margin: 0.9em 0 0.4em; }
+    .concept-content h3 { font-size: 1rem; margin: 0.8em 0 0.3em; }
+    .concept-content p { margin: 0.35em 0; }
+    .concept-content ul { margin: 0.3em 0 0.6em 1.1em; padding: 0; }
+    .concept-content li { margin: 0.2em 0; }
+    .concept-content hr { border: none; border-top: 1px solid #d1d5db; margin: 0.8em 0; }
+    .meta { margin-bottom: 0.75em; color: #222; }
+    .correct { color: #16a34a; font-weight: bold; }
+    .incorrect { color: #dc2626; font-weight: bold; }
+    .quiz-nav { margin-top: 0.5em; }
+    .explanation { margin-top: 0.75em; line-height: 1.45; }
+    .timer-info { background: #fef3c7; border: 1px solid #f59e0b; border-radius: 4px; padding: 0.75em; margin-bottom: 1em; display: flex; flex-direction: row; align-items: center; gap: 0.75em; flex-wrap: nowrap; }
+    .timer-info h4 { margin: 0; color: #92400e; font-size: 0.95em; white-space: nowrap; display: inline; }
+    .timer-display { font-family: monospace; font-size: 1.2em; font-weight: bold; color: #dc2626; white-space: nowrap; display: inline; }
+    .question-nav { display: none; margin: 0.5em 0; }
+    .question-nav input { width: 60px; padding: 0.25em; margin-right: 0.5em; }
+    .question-nav button { padding: 0.4em 0.8em; font-size: 0.9em; }
+    .timer-section { display: flex; justify-content: space-between; align-items: flex-start; gap: 1em; margin-bottom: 1em; }
+    .timer-wrapper { flex: 0 0 auto; min-width: fit-content; }
+    .back-buttons-wrapper { display: flex; gap: 0.5em; justify-content: flex-end; flex-wrap: wrap; }
+    .back-buttons-wrapper button { padding: 0.4em 0.8em; font-size: 0.85em; }
+    .quiz-content { display: flex; flex-direction: row; align-items: center; gap: 1em; }
+    .quiz-inner-content { display: flex; flex-direction: column; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 8px; padding: 1.2em; gap: 0.75em; }
+    .quiz-front, .quiz-back { grid-area: 1 / 1; backface-visibility: hidden; overflow: hidden; }
+    .quiz-back { transform: rotateY(180deg); background: #e8f5e9; }
+    .quiz-back .result { font-weight: 700; margin-bottom: 1em; font-size: 1.2em; }
+    .quiz-back .domain { margin-bottom: 1em; color: #555; font-size: 0.95em; }
+    .quiz-back .explanation { margin: 0; line-height: 1.6; color: #333; }
+    .pre-exam-panel { background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 8px; padding: 1em 1.25em; margin-bottom: 1em; }
+    .pre-exam-panel h3 { margin: 0 0 0.4em 0; font-size: 1.05em; }
+    .pre-exam-panel p { margin: 0 0 0.8em 0; color: #374151; }
+    #startExamBtn { display: block; margin: 1.1em auto 0; padding: 0.85em 2.6em; font-size: 1.15em; font-weight: 600; }
+    .quiz-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5em; }
+    .quiz-header #questionNav { display: flex !important; gap: 0.5em; align-items: center; margin: 0; }
+    .quiz-header #questionNav label { margin: 0; font-size: 0.9em; }
+    .quiz-header #questionNav input { width: 100px; padding: 0.25em; margin: 0; }
+    .quiz-header #questionNav button { padding: 0.25em 0.75em; font-size: 0.85em; margin: 0; }
+    .quiz-header #questionCounter { display: flex !important; margin: 0; font-size: 0.9em; color: #666; }
+    .quiz-header-right { display: flex; align-items: center; gap: 0.5em; }
+    #bookmarkToggleBtn { margin: 0; padding: 0.3em 0.7em; font-size: 0.85em; background: #475569; }
+    #bookmarkToggleBtn.active { background: #f59e0b; color: #111827; }
+    .session-progress { display: flex; align-items: center; gap: 0.6em; flex-wrap: wrap; margin: 0; color: #374151; font-size: 0.9em; }
+    .session-progress span { background: #e5e7eb; border-radius: 999px; padding: 0.2em 0.7em; }
+    #nextBookmarkedBtn { margin: 0; padding: 0.3em 0.7em; font-size: 0.85em; }
+    .chevron { font-size: 1.6em; display: inline-block; vertical-align: middle; line-height: 1; position: relative; top: -2px; }
+    #prevCard, #nextCard { padding: 0.5em 1em; background: #3b82f6; color: #fff; border: none; border-radius: 4px; cursor: pointer; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 0.5em; transition: all 0.3s ease; font-size: 0.9em; white-space: nowrap; flex: 0 0 auto; }
+    #prevCard:hover, #nextCard:hover { background: #2563eb; transform: scale(1.05); }
+    #prevCard:disabled, #nextCard:disabled { background: #bbb; cursor: not-allowed; transform: scale(1); }
+    .flashcard { background: #e3e9f7; border-radius: 6px; padding: 1.35em; text-align: left; font-size: 1.05em; }
+    #endExamBtn { background: #dc2626; }
+    #endExamBtn:hover { background: #b91c1c; }
+    .review-panel { margin-top: 1em; }
+    .review-score { background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 8px; padding: 0.75em 1.1em; margin-bottom: 1.2em; font-size: 1.1em; font-weight: 600; color: #1e3a8a; }
+    .review-item { border: 1px solid #d1d5db; border-radius: 8px; padding: 1em 1.2em; margin-bottom: 1.1em; background: #fafafa; }
+    .review-q-header { display: flex; align-items: center; gap: 0.75em; margin-bottom: 0.5em; }
+    .review-num { background: #3b82f6; color: #fff; border-radius: 4px; padding: 0.15em 0.55em; font-size: 0.85em; font-weight: 600; }
+    .review-q-text { font-weight: 500; margin-bottom: 0.75em; line-height: 1.5; }
+    .review-options { display: flex; flex-direction: column; gap: 0.35em; margin-bottom: 0.75em; }
+    .review-option { padding: 0.45em 0.8em; border-radius: 5px; border: 1px solid #e5e7eb; background: #fff; font-size: 0.95em; }
+    .review-option.review-correct { background: #d1fae5; border-color: #16a34a; color: #14532d; font-weight: 600; }
+    .review-option.review-incorrect { background: #fee2e2; border-color: #dc2626; color: #7f1d1d; font-weight: 600; }
+    .review-option.review-correct-answer { background: #d1fae5; border-color: #16a34a; color: #14532d; font-weight: 600; }
+    .review-domain { font-size: 0.88em; color: #555; margin-bottom: 0.35em; }
+    .review-explanation { font-size: 0.92em; color: #333; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>GH-600 Flashcards Practice</h2>
+    <div id="quizSection" style="display:block;">
+    <div class="timer-section">
+      <div class="timer-wrapper">
+        <div id="timerInfo" class="timer-info">
+          <h4>Time Remaining:</h4>
+          <div id="timerDisplay" class="timer-display">120:00</div>
+        </div>
+      </div>
+      <div id="backButtonsWrapper" class="back-buttons-wrapper" style="display:none;">
+        <button id="endExamBtn" type="button">End Exam</button>
+        <button id="backToStart" type="button">Back to Start</button>
+      </div>
+    </div>
+    <div id="preExamPanel" class="pre-exam-panel">
+      <h3>Ready to Begin?</h3>
+      <p>The timer starts only when you click Start Exam.</p>
+      <p>Review before you start:
+        <a href="https://learn.microsoft.com/en-us/credentials/certifications/agentic-ai-developer/?practice-assessment-type=certification" target="_blank" rel="noopener noreferrer">Official Certification Page</a> &nbsp;|&nbsp;
+        <a href="https://learn.microsoft.com/en-us/credentials/certifications/resources/study-guides/gh-600" target="_blank" rel="noopener noreferrer">GH-600 Study Guide</a>
+      </p>
+      <p id="sessionSummary"></p>
+      <button id="startExamBtn" type="button">Start Exam</button>
+    </div>
+    <div id="quizContent" class="quiz-content" style="display:none;">
+      <button id="prevCard" type="button"><span class="chevron">‹</span> Previous</button>
+      <div class="quiz-flip-shell">
+        <div class="quiz-inner-flip" id="quizInnerFlip">
+          <div class="quiz-inner-content quiz-front">
+            <div class="quiz-header">
+              <div id="questionNav" class="question-nav" style="display:none;">
+                <label>Jump to:</label>
+                <input type="number" id="jumpToQuestionInput" min="1" placeholder="e.g., 5">
+                <button id="jumpToQuestionBtn" type="button">Go</button>
+              </div>
+              <div class="quiz-header-right">
+                <div id="questionCounter" class="meta" style="display:none;"></div>
+                <button id="bookmarkToggleBtn" type="button">☆ Bookmark</button>
+              </div>
+            </div>
+            <div id="sessionProgress" class="session-progress" style="display:none;">
+              <span id="answeredCounter">Answered: 0 / 0</span>
+              <span id="bookmarkedCounter">Bookmarked: 0</span>
+              <button id="nextBookmarkedBtn" type="button">Next Bookmarked</button>
+            </div>
+            <div class="flashcard" id="flashcard">Loading...</div>
+            <form id="optionsForm" class="options"></form>
+            <button id="checkAnswer">Check Answer</button>
+          </div>
+          <div class="quiz-inner-content quiz-back" id="quizResponseCard"></div>
+        </div>
+      </div>
+      <button id="nextCard">Next <span class="chevron">›</span></button>
+    </div>
+    <div id="reviewPanel" class="review-panel" style="display:none;"></div>
+    </div>
+  </div>
+  <script src="./gh600-question-bank.js"></script>
+  <script>
+    const flashcardDiv = document.getElementById('flashcard');
+    const quizInnerFlip = document.getElementById('quizInnerFlip');
+    const quizResponseCard = document.getElementById('quizResponseCard');
+    const nextCardBtn = document.getElementById('nextCard');
+    const optionsForm = document.getElementById('optionsForm');
+    const checkAnswerBtn = document.getElementById('checkAnswer');
+    const backButtonsWrapper = document.getElementById('backButtonsWrapper');
+    const backToStartBtn = document.getElementById('backToStart');
+    const startExamBtn = document.getElementById('startExamBtn');
+    const preExamPanel = document.getElementById('preExamPanel');
+    const sessionSummary = document.getElementById('sessionSummary');
+    const quizContent = document.getElementById('quizContent');
+    const timerInfo = document.getElementById('timerInfo');
+    const timerDisplay = document.getElementById('timerDisplay');
+    const questionCounter = document.getElementById('questionCounter');
+    const questionNav = document.getElementById('questionNav');
+    const bookmarkToggleBtn = document.getElementById('bookmarkToggleBtn');
+    const sessionProgress = document.getElementById('sessionProgress');
+    const answeredCounter = document.getElementById('answeredCounter');
+    const bookmarkedCounter = document.getElementById('bookmarkedCounter');
+    const nextBookmarkedBtn = document.getElementById('nextBookmarkedBtn');
+    const jumpToQuestionInput = document.getElementById('jumpToQuestionInput');
+    const jumpToQuestionBtn = document.getElementById('jumpToQuestionBtn');
+    const prevCardBtn = document.getElementById('prevCard');
+    const quizSection = document.getElementById('quizSection');
+    const reviewPanel = document.getElementById('reviewPanel');
+    const endExamBtn = document.getElementById('endExamBtn');
+
+    let examData = null;
+    let currentDomain = '__all__';
+    let currentIndex = 0;
+    let answered = false;
+    let currentMode = 'attempt';
+    let quizDeck = [];
+    let timerInterval = null;
+    let timeRemaining = 120 * 60;
+    let answeredQuestionIndexes = new Set();
+    let bookmarkedQuestionIndexes = new Set();
+    let userAnswers = {};
+    const ATTEMPT_SESSION_DISTRIBUTION = { D1: 11, D2: 14, D3: 8, D4: 10, D5: 10, D6: 7 };
+
+    function escapeHtml(value) {
+      return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function formatInline(text) {
+      let safe = escapeHtml(text);
+      safe = safe.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      return safe;
+    }
+
+    function renderMarkdown(markdown) {
+      const lines = markdown.replace(/\r\n/g, '\n').split('\n').map((line) => line.replace(/^\s{4}/, ''));
+      const htmlParts = [];
+      let inList = false;
+
+      const closeList = () => {
+        if (inList) {
+          htmlParts.push('</ul>');
+          inList = false;
+        }
+      };
+
+      lines.forEach((line) => {
+        const trimmed = line.trim();
+        if (trimmed === '') {
+          closeList();
+          return;
+        }
+        if (/^---+$/.test(trimmed)) {
+          closeList();
+          htmlParts.push('<hr>');
+          return;
+        }
+        if (trimmed.startsWith('### ')) {
+          closeList();
+          htmlParts.push('<h3>' + formatInline(trimmed.slice(4)) + '</h3>');
+          return;
+        }
+        if (trimmed.startsWith('## ')) {
+          closeList();
+          htmlParts.push('<h2>' + formatInline(trimmed.slice(3)) + '</h2>');
+          return;
+        }
+        if (trimmed.startsWith('# ')) {
+          closeList();
+          htmlParts.push('<h1>' + formatInline(trimmed.slice(2)) + '</h1>');
+          return;
+        }
+        if (trimmed.startsWith('- ')) {
+          if (!inList) {
+            htmlParts.push('<ul>');
+            inList = true;
+          }
+          htmlParts.push('<li>' + formatInline(trimmed.slice(2)) + '</li>');
+          return;
+        }
+        closeList();
+        htmlParts.push('<p>' + formatInline(trimmed) + '</p>');
+      });
+
+      closeList();
+      return htmlParts.join('');
+    }
+
+    function getCurrentCards() {
+      if (!examData) {
+        return [];
+      }
+      if (currentMode === 'attempt') {
+        return quizDeck;
+      }
+      if (currentDomain === '__all__') {
+        return examData.questions;
+      }
+      return examData.questions.filter((q) => q.domainId === currentDomain);
+    }
+
+    function getDomainTitle(domainId) {
+      const domain = examData.domains.find((d) => d.id === domainId);
+      return domain ? domain.title : 'Unknown domain';
+    }
+
+    function shuffleArray(input) {
+      const arr = input.slice();
+      for (let i = arr.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = tmp;
+      }
+      return arr;
+    }
+
+    function randomizeQuestionOptions(question) {
+      const order = shuffleArray(question.options.map((_, idx) => idx));
+      const randomizedOptions = order.map((idx) => question.options[idx]);
+      const randomizedAnswer = order.indexOf(question.answer);
+      return {
+        id: question.id,
+        domainId: question.domainId,
+        q: question.q,
+        options: randomizedOptions,
+        answer: randomizedAnswer,
+        explanation: question.explanation
+      };
+    }
+
+    function getQuestionKey(question) {
+      return question.q.trim().replace(/\s+/g, ' ').toLowerCase();
+    }
+
+    function getUniqueQuestions(questions) {
+      const seen = new Set();
+      return questions.filter((question) => {
+        const key = getQuestionKey(question);
+        if (seen.has(key)) {
+          return false;
+        }
+        seen.add(key);
+        return true;
+      });
+    }
+
+    function getAttemptSessionDistribution() {
+      if (examData && examData.meta && examData.meta.sessionDistribution) {
+        return examData.meta.sessionDistribution;
+      }
+      return ATTEMPT_SESSION_DISTRIBUTION;
+    }
+
+    function getAttemptSessionTargetCount() {
+      return Object.values(getAttemptSessionDistribution()).reduce((sum, count) => sum + count, 0);
+    }
+
+    function getUniqueAttemptPools() {
+      return examData.domains.map((domain) => {
+        const uniqueQuestions = shuffleArray(getUniqueQuestions(examData.questions.filter((question) => question.domainId === domain.id)));
+        return {
+          domainId: domain.id,
+          questions: uniqueQuestions,
+          targetCount: getAttemptSessionDistribution()[domain.id] || 0,
+          pickedCount: 0
+        };
+      });
+    }
+
+    function updateAttemptSessionSummary() {
+      if (!examData || !sessionSummary) {
+        return;
+      }
+      const pools = getUniqueAttemptPools();
+      const uniqueAvailable = pools.reduce((sum, pool) => sum + pool.questions.length, 0);
+      const targetCount = getAttemptSessionTargetCount();
+      if (uniqueAvailable >= targetCount) {
+        sessionSummary.textContent = 'This practice exam uses ' + targetCount + ' unique questions with the configured skill distribution.';
+        return;
+      }
+      sessionSummary.textContent = 'This bank currently has ' + uniqueAvailable + ' unique question stems, so attempt mode uses ' + uniqueAvailable + ' non-repeating questions and keeps the domain weighting as close as possible.';
+    }
+
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return (mins < 10 ? '0' : '') + mins + ':' + (secs < 10 ? '0' : '') + secs;
+    }
+
+    function startTimer() {
+      timeRemaining = 120 * 60;
+      timerDisplay.textContent = formatTime(timeRemaining);
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        timeRemaining -= 1;
+        timerDisplay.textContent = formatTime(timeRemaining);
+        if (timeRemaining <= 0) {
+          clearInterval(timerInterval);
+          timerDisplay.textContent = '00:00';
+          alert('Time is up!');
+          backToStartBtn.click();
+        }
+      }, 1000);
+    }
+
+    function stopTimer() {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+    }
+
+    function updateQuestionCounter() {
+      if (currentMode === 'attempt') {
+        const total = getCurrentCards().length;
+        questionCounter.textContent = 'Question ' + (currentIndex + 1) + ' of ' + total;
+        questionCounter.style.display = 'block';
+      } else {
+        questionCounter.style.display = 'none';
+      }
+    }
+
+    function updateSessionProgress() {
+      if (currentMode !== 'attempt') {
+        sessionProgress.style.display = 'none';
+        return;
+      }
+      const total = getCurrentCards().length;
+      answeredCounter.textContent = 'Answered: ' + answeredQuestionIndexes.size + ' / ' + total;
+      bookmarkedCounter.textContent = 'Bookmarked: ' + bookmarkedQuestionIndexes.size;
+      const isBookmarked = bookmarkedQuestionIndexes.has(currentIndex);
+      bookmarkToggleBtn.textContent = isBookmarked ? '★ Bookmarked' : '☆ Bookmark';
+      bookmarkToggleBtn.classList.toggle('active', isBookmarked);
+      nextBookmarkedBtn.disabled = bookmarkedQuestionIndexes.size === 0;
+      sessionProgress.style.display = 'flex';
+    }
+
+    function createQuizDeck() {
+      if (currentMode === 'attempt') {
+        const pools = getUniqueAttemptPools();
+        const targetCount = getAttemptSessionTargetCount();
+        const maxUniqueCount = pools.reduce((sum, pool) => sum + pool.questions.length, 0);
+        const targetUniqueCount = Math.min(targetCount, maxUniqueCount);
+        let remaining = targetUniqueCount;
+
+        pools.forEach((pool) => {
+          pool.pickedCount = Math.min(pool.targetCount, pool.questions.length);
+          remaining -= pool.pickedCount;
+        });
+
+        while (remaining > 0) {
+          let assignedInPass = false;
+          pools.forEach((pool) => {
+            if (remaining === 0) {
+              return;
+            }
+            if (pool.pickedCount < pool.questions.length) {
+              pool.pickedCount += 1;
+              remaining -= 1;
+              assignedInPass = true;
+            }
+          });
+          if (!assignedInPass) {
+            break;
+          }
+        }
+
+        quizDeck = shuffleArray(
+          pools.flatMap((pool) => pool.questions.slice(0, pool.pickedCount).map((question) => randomizeQuestionOptions(question)))
+        );
+      } else {
+        const source = currentDomain === '__all__'
+          ? examData.questions
+          : examData.questions.filter((q) => q.domainId === currentDomain);
+        quizDeck = shuffleArray(source);
+      }
+      currentIndex = 0;
+      answeredQuestionIndexes = new Set();
+      bookmarkedQuestionIndexes = new Set();
+      userAnswers = {};
+    }
+
+
+    function showCard() {
+      const cards = getCurrentCards();
+      if (!cards || cards.length === 0) {
+        flashcardDiv.textContent = 'No questions for this selection.';
+        optionsForm.innerHTML = '';
+        checkAnswerBtn.disabled = true;
+        nextCardBtn.disabled = true;
+        prevCardBtn.disabled = true;
+        quizInnerFlip.classList.remove('flipped');
+        return;
+      }
+
+      const card = cards[currentIndex];
+      if (!card || !Array.isArray(card.options) || typeof card.answer !== 'number') {
+        flashcardDiv.textContent = 'Malformed question data.';
+        optionsForm.innerHTML = '';
+        checkAnswerBtn.disabled = true;
+        nextCardBtn.disabled = true;
+        prevCardBtn.disabled = true;
+        quizInnerFlip.classList.remove('flipped');
+        return;
+      }
+
+      flashcardDiv.innerHTML = '<strong>Question:</strong> ' + escapeHtml(card.q);
+      optionsForm.innerHTML = '';
+      card.options.forEach((opt, i) => {
+        const label = document.createElement('label');
+        label.className = 'option';
+        const input = document.createElement('input');
+        input.type = 'radio';
+        input.name = 'option';
+        input.value = i;
+        label.appendChild(input);
+        label.appendChild(document.createTextNode(' ' + opt));
+        optionsForm.appendChild(label);
+      });
+
+      checkAnswerBtn.disabled = false;
+      const hasAnswered = answeredQuestionIndexes.has(currentIndex);
+      const hasBookmarked = bookmarkedQuestionIndexes.has(currentIndex);
+      nextCardBtn.disabled = !(hasAnswered || hasBookmarked);
+      const isCompletedAttempt = currentMode === 'attempt' && answeredQuestionIndexes.size === cards.length;
+      if (isCompletedAttempt && currentIndex === cards.length - 1) {
+        nextCardBtn.innerHTML = 'View Summary';
+      } else {
+        nextCardBtn.innerHTML = 'Next <span class="chevron">›</span>';
+      }
+      prevCardBtn.disabled = currentIndex === 0;
+      answered = false;
+      quizInnerFlip.classList.remove('flipped');
+      updateQuestionCounter();
+      updateSessionProgress();
+    }
+
+    function wireEvents() {
+      startExamBtn.addEventListener('click', () => {
+        currentMode = 'attempt';
+        currentDomain = '__all__';
+        document.querySelector('.container').classList.remove('review-mode');
+        preExamPanel.style.display = 'none';
+        quizContent.style.display = 'flex';
+        quizSection.style.display = 'block';
+        backButtonsWrapper.style.display = 'flex';
+        timerInfo.style.display = 'block';
+        questionNav.style.display = 'block';
+        createQuizDeck();
+        showCard();
+        startTimer();
+      });
+
+      endExamBtn.addEventListener('click', () => {
+        if (answeredQuestionIndexes.size === 0) {
+          alert('Answer at least one question before ending the exam.');
+          return;
+        }
+        if (!confirm('End the exam and review your answered questions?')) return;
+        showReviewPanel();
+      });
+
+      backToStartBtn.addEventListener('click', () => {
+        if (!confirm('Return to start? All progress will be lost and you will not be able to review your responses.')) return;
+        currentMode = 'attempt';
+        stopTimer();
+        document.querySelector('.container').classList.remove('review-mode');
+        timerDisplay.textContent = formatTime(120 * 60);
+        timerInfo.style.display = 'block';
+        backButtonsWrapper.style.display = 'none';
+        questionNav.style.display = 'none';
+        quizSection.style.display = 'block';
+        preExamPanel.style.display = 'block';
+        quizContent.style.display = 'none';
+        reviewPanel.style.display = 'none';
+        reviewPanel.innerHTML = '';
+        questionCounter.style.display = 'none';
+        sessionProgress.style.display = 'none';
+        jumpToQuestionInput.value = '';
+        nextCardBtn.disabled = true;
+        prevCardBtn.disabled = true;
+        checkAnswerBtn.disabled = true;
+        answered = false;
+        quizInnerFlip.classList.remove('flipped');
+      });
+
+      checkAnswerBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (answered) {
+          return;
+        }
+        const selected = optionsForm.querySelector('input[name="option"]:checked');
+        if (!selected) {
+          alert('Please select an answer.');
+          return;
+        }
+        const cards = getCurrentCards();
+        const card = cards[currentIndex];
+        const selectedIndex = parseInt(selected.value, 10);
+        let resultHtml = '';
+        if (selectedIndex === card.answer) {
+          resultHtml = '<span class="correct">✓ Correct!</span>';
+        } else {
+          resultHtml = '<span class="incorrect">✗ Incorrect</span><br>Correct answer: <b>' + escapeHtml(card.options[card.answer]) + '</b>';
+        }
+        const backContent = '<div class="result">' + resultHtml + '</div>' +
+          '<div class="domain"><strong>Domain:</strong> ' + escapeHtml(getDomainTitle(card.domainId)) + '</div>' +
+          '<div class="explanation"><strong>Explanation:</strong> ' + escapeHtml(card.explanation) + '</div>';
+        quizResponseCard.innerHTML = backContent;
+        quizInnerFlip.classList.add('flipped');
+        checkAnswerBtn.disabled = true;
+        nextCardBtn.disabled = false;
+        answered = true;
+        answeredQuestionIndexes.add(currentIndex);
+        userAnswers[currentIndex] = selectedIndex;
+        updateSessionProgress();
+      });
+
+      bookmarkToggleBtn.addEventListener('click', () => {
+        if (bookmarkedQuestionIndexes.has(currentIndex)) {
+          bookmarkedQuestionIndexes.delete(currentIndex);
+        } else {
+          bookmarkedQuestionIndexes.add(currentIndex);
+        }
+        const canMoveNext = answeredQuestionIndexes.has(currentIndex) || bookmarkedQuestionIndexes.has(currentIndex);
+        nextCardBtn.disabled = !canMoveNext;
+        updateSessionProgress();
+      });
+
+      nextBookmarkedBtn.addEventListener('click', () => {
+        if (bookmarkedQuestionIndexes.size === 0) {
+          return;
+        }
+        const sorted = Array.from(bookmarkedQuestionIndexes).sort((a, b) => a - b);
+        const nextIdx = sorted.find((idx) => idx > currentIndex);
+        currentIndex = nextIdx !== undefined ? nextIdx : sorted[0];
+        showCard();
+      });
+
+      prevCardBtn.addEventListener('click', () => {
+        if (currentIndex > 0) {
+          currentIndex -= 1;
+          showCard();
+        }
+      });
+
+      nextCardBtn.addEventListener('click', () => {
+        const cards = getCurrentCards();
+        const isCompletedAttempt = currentMode === 'attempt' && answeredQuestionIndexes.size === cards.length;
+        if (isCompletedAttempt && currentIndex === cards.length - 1) {
+          showReviewPanel();
+          return;
+        }
+        currentIndex = (currentIndex + 1) % cards.length;
+        showCard();
+      });
+
+      jumpToQuestionBtn.addEventListener('click', () => {
+        const targetIndex = parseInt(jumpToQuestionInput.value, 10) - 1;
+        const cards = getCurrentCards();
+        if (targetIndex >= 0 && targetIndex < cards.length) {
+          currentIndex = targetIndex;
+          jumpToQuestionInput.value = '';
+          showCard();
+        } else {
+          alert('Please enter a valid question number between 1 and ' + cards.length);
+        }
+      });
+    }
+
+    function showReviewPanel() {
+      stopTimer();
+      quizContent.style.display = 'none';
+      endExamBtn.style.display = 'none';
+      const answeredArr = Array.from(answeredQuestionIndexes).sort((a, b) => a - b);
+      const total = answeredArr.length;
+      let correctCount = 0;
+      answeredArr.forEach((idx) => {
+        if (userAnswers[idx] === quizDeck[idx].answer) correctCount++;
+      });
+      const pct = total > 0 ? Math.round((correctCount / total) * 100) : 0;
+      let questionsHtml = '';
+      answeredArr.forEach((deckIdx, num) => {
+        const card = quizDeck[deckIdx];
+        const userChoice = userAnswers[deckIdx];
+        const isCorrect = userChoice === card.answer;
+        let optionsHtml = '';
+        card.options.forEach((opt, optIdx) => {
+          const isUserChoice = optIdx === userChoice;
+          const isCorrectAnswer = optIdx === card.answer;
+          let cls = 'review-option';
+          let prefix = '';
+          if (isUserChoice && isCorrect) {
+            cls += ' review-correct';
+            prefix = '✓ ';
+          } else if (isUserChoice && !isCorrect) {
+            cls += ' review-incorrect';
+            prefix = '✗ ';
+          } else if (!isUserChoice && isCorrectAnswer) {
+            cls += ' review-correct-answer';
+            prefix = '✓ ';
+          }
+          optionsHtml += '<div class="' + cls + '">' + prefix + escapeHtml(opt) + '</div>';
+        });
+        questionsHtml +=
+          '<div class="review-item">' +
+          '<div class="review-q-header">' +
+          '<span class="review-num">Q' + (num + 1) + '</span>' +
+          '<span class="' + (isCorrect ? 'correct' : 'incorrect') + '">' + (isCorrect ? '✓ Correct' : '✗ Incorrect') + '</span>' +
+          '</div>' +
+          '<div class="review-q-text">' + escapeHtml(card.q) + '</div>' +
+          '<div class="review-options">' + optionsHtml + '</div>' +
+          '<div class="review-domain"><strong>Domain:</strong> ' + escapeHtml(getDomainTitle(card.domainId)) + '</div>' +
+          '<div class="review-explanation"><strong>Explanation:</strong> ' + escapeHtml(card.explanation) + '</div>' +
+          '</div>';
+      });
+      reviewPanel.innerHTML =
+        '<h3>Exam Review</h3>' +
+        '<div class="review-score">Score: ' + correctCount + ' / ' + total + ' answered (' + pct + '% correct)</div>' +
+        (total === 0 ? '<p>No questions were answered.</p>' : questionsHtml);
+      reviewPanel.style.display = 'block';
+    }
+
+    async function loadQuestionBank() {
+      if (window.GH600_QUESTION_BANK && Array.isArray(window.GH600_QUESTION_BANK.questions)) {
+        return window.GH600_QUESTION_BANK;
+      }
+
+      const response = await fetch('./gh600-question-bank.json');
+      if (!response.ok) {
+        throw new Error('Failed to load question bank: HTTP ' + response.status);
+      }
+      return response.json();
+    }
+
+    async function initialize() {
+      try {
+        examData = await loadQuestionBank();
+        wireEvents();
+        currentMode = 'attempt';
+        currentDomain = '__all__';
+        document.querySelector('.container').classList.remove('review-mode');
+        quizSection.style.display = 'block';
+        preExamPanel.style.display = 'block';
+        quizContent.style.display = 'none';
+        timerInfo.style.display = 'block';
+        backButtonsWrapper.style.display = 'none';
+        timerDisplay.textContent = formatTime(120 * 60);
+        questionNav.style.display = 'none';
+        questionCounter.style.display = 'none';
+        updateAttemptSessionSummary();
+      } catch (error) {
+        flashcardDiv.textContent = 'Unable to initialize quiz.';
+        optionsForm.innerHTML = '';
+        checkAnswerBtn.disabled = true;
+        nextCardBtn.disabled = true;
+        prevCardBtn.disabled = true;
+      }
+    }
+
+    initialize();
+  </script>
+</body>
+</html>
